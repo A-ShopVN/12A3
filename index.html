@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kỷ Yếu 12A3</title>
+    <title>Kỷ Yếu 12A3 - Cloud Version</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1421,6 +1421,38 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+
+
+        // Chặn chuột phải
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+// Chặn phím
+window.addEventListener('keydown', function(e) {
+
+    // Ctrl+U
+    if (e.ctrlKey && e.key.toLowerCase() === 'u') {
+        e.preventDefault();
+        return false;
+    }
+
+    // Ctrl+Shift+I
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        return false;
+    }
+
+    // Ctrl+Shift+J
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        return false;
+    }
+
+    // F12
+    if (e.key === 'F12') {
+        e.preventDefault();
+        return false;
+    }
+});
     </script>
 </body>
 </html>
