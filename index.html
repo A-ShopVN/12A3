@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kỷ Yếu 12A3 </title>
-
+    <title>Kỷ Yếu 12A3 - Hành Trình Thanh Xuân</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -123,6 +122,52 @@
             z-index: 1001 !important;
             background-color: white;
         }
+
+        /* --- CSS CHỐNG TRỘM ẢNH --- */
+        .anti-theft-img {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none; /* Ngăn nhấn giữ trên điện thoại để lưu ảnh */
+        }
+        
+        /* Watermark mờ chống chụp màn hình */
+        .watermark-overlay {
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' font-size='20' fill='rgba(255,255,255,0.15)' font-family='Arial' font-weight='bold' text-anchor='middle' alignment-baseline='middle' transform='rotate(-45, 100, 100)'%3EK%E1%BB%B7 Y%E1%BA%BFu 12A3%3C/text%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* --- CƠ CHẾ CHỐNG CHỤP MÀN HÌNH TỐC ĐỘ CAO --- */
+        /* Không dùng blur vì render chậm, dùng opacity 0 để đen ngay lập tức */
+        body.anti-screenshot-active {
+            background-color: #111 !important;
+        }
+        body.anti-screenshot-active #root {
+            opacity: 0 !important;
+            transition: none !important; /* Tắt mọi hiệu ứng chuyển động để ẩn ngay lập tức */
+            pointer-events: none;
+            user-select: none;
+        }
+        body.anti-screenshot-active::after {
+            content: "🛡️ PHÁT HIỆN THAO TÁC CHỤP ẢNH! HÌNH ẢNH ĐÃ BỊ ẨN.";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f43f5e;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 999999;
+            text-align: center;
+            background: rgba(255,255,255,1);
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
@@ -203,30 +248,89 @@
         ];
 
         const App = () => {
-            // Khôi phục vị trí trang từ localStorage (Tránh việc F5 bị mất dấu)
             const savedSlide = parseInt(localStorage.getItem('kyyeu_currentSlide')) || 0;
             const [currentSlide, setCurrentSlide] = useState(savedSlide);
             const totalSlides = 6; 
 
-            // Cập nhật localStorage mỗi khi đổi Slide
             useEffect(() => {
                 localStorage.setItem('kyyeu_currentSlide', currentSlide);
             }, [currentSlide]);
 
-            // STATE PHÂN QUYỀN (null: chưa chọn, 'member': thành viên, 'guest': khách)
+            // THÊM: Hook Chống Ăn Cắp Ảnh Tối Đa (Bắt Win+Shift+S)
+            useEffect(() => {
+                const triggerAntiScreenshot = () => {
+                    document.body.classList.add('anti-screenshot-active');
+                    // Tự động gỡ đen màn hình sau 3 giây
+                    setTimeout(() => {
+                        document.body.classList.remove('anti-screenshot-active');
+                    }, 3000);
+                };
+
+                const handleContextMenu = (e) => {
+                    e.preventDefault();
+                    setCustomDialog({ title: "Bảo Mật", message: "Chức năng lưu ảnh/chuột phải đã bị vô hiệu hóa.", type: "alert" });
+                };
+                
+                const handleKeyDown = (e) => {
+                    // 1. Chặn DevTools (F12, Ctrl+Shift+I) và Lưu trang (Ctrl+S)
+                    if (
+                        e.key === 'F12' || 
+                        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'C' || e.key === 'c')) || 
+                        (e.ctrlKey && (e.key === 'S' || e.key === 's' || e.key === 'U' || e.key === 'u'))
+                    ) {
+                        e.preventDefault();
+                    }
+
+                    // 2. Chặn Cắt màn hình Windows (Win + Shift + S) & Mac (Cmd + Shift + 3/4)
+                    // e.metaKey chính là phím Windows hoặc phím Command
+                    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 's' || e.key === 'S' || e.key === '3' || e.key === '4')) {
+                        triggerAntiScreenshot();
+                        setCustomDialog({ title: "Cảnh Báo", message: "Phát hiện công cụ cắt ảnh. Dữ liệu đã bị ẩn!", type: "alert" });
+                    }
+
+                    // 3. Chặn phím PrintScreen ngay khi nhấn xuống (không đợi nhả phím)
+                    if (e.key === 'PrintScreen' || e.keyCode === 44) {
+                        navigator.clipboard.writeText('Cảnh báo: Hành động chụp màn hình kỷ yếu bị cấm!');
+                        triggerAntiScreenshot();
+                    }
+                };
+
+                // 4. Bắt sự kiện khi trang mất tiêu điểm (Mở Snipping Tool bằng chuột, Zalo PC...)
+                const handleVisibilityChange = () => {
+                    if (document.hidden || document.visibilityState === 'hidden') {
+                        document.body.classList.add('anti-screenshot-active');
+                    } else {
+                        setTimeout(() => document.body.classList.remove('anti-screenshot-active'), 300);
+                    }
+                };
+
+                const handleBlur = () => document.body.classList.add('anti-screenshot-active');
+                const handleFocus = () => setTimeout(() => document.body.classList.remove('anti-screenshot-active'), 300);
+
+                document.addEventListener('contextmenu', handleContextMenu);
+                document.addEventListener('keydown', handleKeyDown);
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                window.addEventListener('blur', handleBlur);
+                window.addEventListener('focus', handleFocus);
+
+                return () => {
+                    document.removeEventListener('contextmenu', handleContextMenu);
+                    document.removeEventListener('keydown', handleKeyDown);
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('blur', handleBlur);
+                    window.removeEventListener('focus', handleFocus);
+                };
+            }, []);
+
             const [userRole, setUserRole] = useState(localStorage.getItem('kyyeu_userRole') || null);
             const isGuest = userRole === 'guest';
             
-            // XÁC THỰC THÀNH VIÊN
             const [showAuthModal, setShowAuthModal] = useState(false);
             const [authPassword, setAuthPassword] = useState('');
             const [authAttempts, setAuthAttempts] = useState(0);
             const [authError, setAuthError] = useState('');
             
-            // THÊM STATE CHO TUTORIAL (GAME MODE)
-            // 0: Tắt, 1: Tìm người, 2: Bấm sửa, 3: Đổi thông tin, 4: Lưu
             const [tutorialStep, setTutorialStep] = useState(0);
-
             const [touchStart, setTouchStart] = useState(null);
             const [touchEnd, setTouchEnd] = useState(null);
             
@@ -238,9 +342,17 @@
             const [selectedMember, setSelectedMember] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
             const [editForm, setEditForm] = useState({});
+            
+            // THÊM STATE CHO HỆ THỐNG MÃ PIN
+            const [pinConfig, setPinConfig] = useState({ show: false, mode: '', error: '' }); 
+            const [pinInput1, setPinInput1] = useState(''); // Nhập mã
+            const [pinInput2, setPinInput2] = useState(''); // Mã mới
+            const [pinInput3, setPinInput3] = useState(''); // Xác nhận mã mới
+            // Danh sách các member đã được unlock trong phiên làm việc hiện tại
+            const [sessionUnlockedMembers, setSessionUnlockedMembers] = useState(new Set());
+
             const [showFirebaseError, setShowFirebaseError] = useState(false);
             const [customDialog, setCustomDialog] = useState(null); 
-            
             const [showAddMedia, setShowAddMedia] = useState(false);
             const [mediaForm, setMediaForm] = useState({ type: 'image', url: '', caption: '', grade: '12A3', context: 'general' });
             
@@ -273,7 +385,6 @@
                 return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
             };
 
-            // Hàm xử lý các Link Mạng xã hội cho chính xác (Bất chấp nhập link tắt như @username)
             const formatSocialLink = (link, platform) => {
                 if (!link) return '#';
                 let formatted = link.trim();
@@ -296,7 +407,7 @@
             };
 
             useEffect(() => {
-                if (!userRole) return; // Không connect Firebase nếu chưa chọn Role để tối ưu
+                if (!userRole) return; 
                 const initTimer = setTimeout(async () => {
                     const { collection, onSnapshot, signInAnonymously, doc } = window.firebaseHooks;
                     const db = window.firebaseDB;
@@ -324,10 +435,28 @@
                                 const id = `member_${i+1}`;
                                 const found = dbMembers.find(m => m.id === id);
                                 const defaultInfo = DEFAULT_CLASS_LIST[i] || { name: `Thành viên ${i+1}`, role: 'Thành viên' };
-                                return found || {
+                                const defaultAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=12A3_${i + 1}&backgroundColor=ffe4e6`;
+                                
+                                // TỰ ĐỘNG MỞ KHÓA NẾU CHƯA CÓ PIN:
+                                let actualIsLocked = false;
+                                if (found) {
+                                    actualIsLocked = found.isLocked && !!found.pin;
+                                }
+
+                                // FIX LỖI AVATAR BỊ TRỐNG: Luôn đảm bảo có avatar và thông tin mặc định nếu Firebase bị khuyết
+                                return found ? { 
+                                    ...found, 
+                                    name: defaultInfo.name, // Ép dùng tên cứng của lớp
+                                    role: defaultInfo.role, // Ép dùng chức vụ cứng
+                                    avatar: found.avatar || defaultAvatar, // Dùng ảnh mặc định nếu chưa up
+                                    quote: found.quote || 'Thanh xuân như một cơn mưa rào...',
+                                    theme: found.theme || 'rose',
+                                    messages: found.messages || [],
+                                    isLocked: actualIsLocked 
+                                } : {
                                     id, name: defaultInfo.name, role: defaultInfo.role,
-                                    avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=12A3_${i + 1}&backgroundColor=ffe4e6`,
-                                    quote: 'Thanh xuân như một cơn mưa rào...', facebook: '', instagram: '', tiktok: '', isLocked: false, theme: 'rose', messages: []
+                                    avatar: defaultAvatar,
+                                    quote: 'Thanh xuân như một cơn mưa rào...', facebook: '', instagram: '', tiktok: '', isLocked: false, pin: null, theme: 'rose', messages: []
                                 };
                             });
                             setMembers(mergedMembers);
@@ -400,13 +529,13 @@
                         if (e.key === 'ArrowLeft') prevTheaterSlide();
                         return;
                     }
-                    if (!userRole || selectedMember || showAddMedia || customDialog || showFirebaseError || selectedMedia || showMemberList || tutorialStep > 0) return; 
+                    if (!userRole || selectedMember || showAddMedia || customDialog || showFirebaseError || selectedMedia || showMemberList || tutorialStep > 0 || pinConfig.show) return; 
                     if (e.key === 'ArrowRight') nextSlide();
                     if (e.key === 'ArrowLeft') prevSlide();
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [currentSlide, selectedMember, showAddMedia, customDialog, showFirebaseError, selectedMedia, isTheaterMode, showMemberList, presentationItems.length, tutorialStep, userRole]);
+            }, [currentSlide, selectedMember, showAddMedia, customDialog, showFirebaseError, selectedMedia, isTheaterMode, showMemberList, presentationItems.length, tutorialStep, userRole, pinConfig.show]);
 
             const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, totalSlides - 1));
             const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
@@ -417,7 +546,7 @@
             };
             const handleTouchMove = (e) => setTouchEnd({ x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY });
             const handleTouchEnd = () => {
-                if (!touchStart || !touchEnd || tutorialStep > 0 || !userRole) return; // Không cho vuốt nếu đang chạy Tutorial hoặc chưa đăng nhập
+                if (!touchStart || !touchEnd || tutorialStep > 0 || !userRole || pinConfig.show) return; 
                 const distanceX = touchStart.x - touchEnd.x;
                 const distanceY = Math.abs(touchStart.y - touchEnd.y);
                 if (distanceY < 80) {
@@ -487,29 +616,122 @@
                 });
             };
 
-            const handleSaveProfile = async (isLocking = false) => {
+            // HÀM XỬ LÝ LƯU (CÓ TÍCH HỢP MÃ PIN)
+            const handleSaveProfile = async (actionType = 'save') => {
                 if (isGuest) return;
                 if (!editForm.facebook || editForm.facebook.trim() === '') {
                     setCustomDialog({ title: "Thiếu thông tin", message: "Vui lòng nhập Link Facebook của bạn để lớp giữ liên lạc nhé!", type: "alert" });
                     return;
                 }
+
+                // Nếu chọn "Tạo mã PIN & Chốt"
+                if (actionType === 'create_pin') {
+                    setPinConfig({ show: true, mode: 'create', error: '' });
+                    setPinInput1('');
+                    return;
+                }
+
                 const { doc, setDoc } = window.firebaseHooks;
                 setIsUploading(true);
                 try {
-                    // CẬP NHẬT: Ghi đè cứng tên gốc từ selectedMember để người dùng không có cách nào sửa tên được (dù cố tình dùng tool)
+                    // Nếu đã có PIN thì auto chốt. Nếu chưa có PIN thì không chốt
+                    const shouldBeLocked = !!selectedMember.pin || !!editForm.pin;
+
                     const finalDataToSave = {
                         ...editForm,
                         name: selectedMember.name, 
-                        isLocked: isLocking
+                        isLocked: shouldBeLocked 
                     };
                     
                     await setDoc(doc(window.firebaseDB, 'artifacts', appId, 'public', 'data', 'members', editForm.id), finalDataToSave, { merge: true });
+                    
+                    // Xóa trạng thái unlock tạm thời khi lưu xong (để bắt nhập lại PIN nếu muốn sửa tiếp)
+                    if (shouldBeLocked) {
+                        const newUnlockedSet = new Set(sessionUnlockedMembers);
+                        newUnlockedSet.delete(selectedMember.id);
+                        setSessionUnlockedMembers(newUnlockedSet);
+                    }
+
                     setIsEditing(false);
-                    // Nếu đang trong Tutorial bước cuối, kết thúc luôn
                     if (tutorialStep === 4) setTutorialStep(0);
+                    
+                    if(shouldBeLocked) {
+                        setCustomDialog({ title: "Thành công", message: "Thông tin đã được lưu và hệ thống tự động khóa lại an toàn.", type: "alert" });
+                    }
+
                 } catch (error) {
                     setCustomDialog({ title: "Lỗi", message: "Không thể lưu.", type: "alert" });
                 } finally { setIsUploading(false); }
+            };
+
+            // HÀM XỬ LÝ SUBMIT MÃ PIN (TẠO/MỞ KHÓA/ĐỔI MÃ)
+            const handlePinSubmit = async (e) => {
+                e.preventDefault();
+                const { mode } = pinConfig;
+                const { doc, setDoc } = window.firebaseHooks;
+
+                if (mode === 'create') {
+                    if (pinInput1.length !== 6) {
+                        setPinConfig(prev => ({ ...prev, error: 'Mã PIN phải có đủ 6 chữ số!' }));
+                        return;
+                    }
+                    setIsUploading(true);
+                    try {
+                        const encodedPin = btoa(pinInput1); // Mã hóa cơ bản
+                        const finalDataToSave = {
+                            ...editForm,
+                            name: selectedMember.name,
+                            pin: encodedPin,
+                            isLocked: true
+                        };
+                        await setDoc(doc(window.firebaseDB, 'artifacts', appId, 'public', 'data', 'members', editForm.id), finalDataToSave, { merge: true });
+                        setPinConfig({ show: false, mode: '', error: '' });
+                        setIsEditing(false);
+                        setCustomDialog({ title: "Đã chốt an toàn!", message: "Hồ sơ của bạn đã được khóa lại bằng Mã PIN. Vui lòng ghi nhớ mã này nhé.", type: "alert" });
+                    } catch (error) {
+                        setPinConfig(prev => ({ ...prev, error: 'Lỗi khi lưu mã PIN.' }));
+                    } finally { setIsUploading(false); }
+                } 
+                else if (mode === 'unlock') {
+                    if (pinInput1.length !== 6) {
+                        setPinConfig(prev => ({ ...prev, error: 'Mã PIN gồm 6 số.' }));
+                        return;
+                    }
+                    const storedPin = atob(selectedMember.pin);
+                    if (pinInput1 === storedPin) {
+                        // Nhập đúng -> Mở khóa phiên hiện tại
+                        setSessionUnlockedMembers(prev => new Set(prev).add(selectedMember.id));
+                        setPinConfig({ show: false, mode: '', error: '' });
+                        setIsEditing(true);
+                    } else {
+                        setPinConfig(prev => ({ ...prev, error: 'Mã PIN không chính xác!' }));
+                    }
+                }
+                else if (mode === 'change') {
+                    const storedPin = atob(selectedMember.pin);
+                    if (pinInput1 !== storedPin) {
+                        setPinConfig(prev => ({ ...prev, error: 'Mã PIN CŨ không chính xác!' }));
+                        return;
+                    }
+                    if (pinInput2.length !== 6) {
+                        setPinConfig(prev => ({ ...prev, error: 'Mã PIN MỚI phải gồm 6 số!' }));
+                        return;
+                    }
+                    if (pinInput2 !== pinInput3) {
+                        setPinConfig(prev => ({ ...prev, error: 'Xác nhận mã PIN mới không khớp!' }));
+                        return;
+                    }
+                    
+                    setIsUploading(true);
+                    try {
+                        const encodedNewPin = btoa(pinInput2);
+                        await setDoc(doc(window.firebaseDB, 'artifacts', appId, 'public', 'data', 'members', selectedMember.id), { pin: encodedNewPin }, { merge: true });
+                        setPinConfig({ show: false, mode: '', error: '' });
+                        setCustomDialog({ title: "Thành công", message: "Đã đổi Mã PIN thành công!", type: "alert" });
+                    } catch (error) {
+                        setPinConfig(prev => ({ ...prev, error: 'Lỗi khi đổi mã PIN.' }));
+                    } finally { setIsUploading(false); }
+                }
             };
 
             const handleLeaveMessage = async (e) => {
@@ -600,7 +822,6 @@
                                 <form onSubmit={(e) => {
                                     e.preventDefault();
                                     const pass = authPassword.toLowerCase().trim();
-                                    // Chấp nhận mật khẩu n23a032026 hoặc 12a32026
                                     if (pass === 'n23a032026' || pass === '12a32026') {
                                         localStorage.setItem('kyyeu_userRole', 'member');
                                         setUserRole('member');
@@ -608,7 +829,6 @@
                                     } else {
                                         const newAttempts = authAttempts + 1;
                                         setAuthAttempts(newAttempts);
-                                        // CẬP NHẬT: Nhập sai 3 lần là lập tức auto đẩy qua chế độ Khách
                                         if (newAttempts >= 3) {
                                             localStorage.setItem('kyyeu_userRole', 'guest');
                                             setUserRole('guest');
@@ -650,7 +870,6 @@
                 );
             }
 
-            // ==== HỆ THỐNG RENDER GAME TUTORIAL (GUIDE BOT) ====
             const renderTutorialGuide = () => {
                 if (tutorialStep === 0) return null;
 
@@ -664,7 +883,6 @@
                         break;
                     case 2:
                         content = { title: "Bước 2: Cập nhật thông tin", text: "Tuyệt vời! Bây giờ hãy nhấn vào nút 'Sửa hồ sơ' đang phát sáng để bắt đầu cập nhật.", next: null };
-                        // Position tránh đè lên nút Sửa
                         positionClass = isMobile ? "top-[10%] left-1/2 -translate-x-1/2" : "top-[20%] left-[25%] -translate-x-1/2"; 
                         break;
                     case 3:
@@ -672,7 +890,7 @@
                         positionClass = "bottom-[10%] md:bottom-[15%] left-1/2 -translate-x-1/2";
                         break;
                     case 4:
-                        content = { title: "Bước cuối: Khóa Ký Ức", text: "Xong rồi thì bấm 'Lưu Thay Đổi'. Nếu bạn chắc chắn 100% không cần đổi nữa, hãy bấm 'Chốt Vĩnh Viễn' (Khóa vĩnh viễn đó nha!).", next: 0 };
+                        content = { title: "Bước cuối: Khóa Ký Ức", text: "Tạo một mã PIN gồm 6 số bí mật để chốt hồ sơ. Nếu sau này muốn đổi ảnh, bạn phải dùng đúng mã PIN này nhé!", next: 0 };
                         positionClass = "top-[10%] md:top-[20%] left-1/2 -translate-x-1/2";
                         break;
                 }
@@ -680,15 +898,11 @@
                 return (
                     <div className="fixed inset-0 z-[1000] pointer-events-none flex items-center justify-center">
                         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-300"></div>
-                        
                         <div className={`absolute ${positionClass} w-[90%] max-w-[350px] pointer-events-auto transition-all duration-500 z-[1002]`}>
                             <div className="bg-white/95 backdrop-blur-xl border-[3px] border-rose-400 rounded-2xl p-4 shadow-[0_0_30px_rgba(244,63,94,0.4)] animate-slideUp relative">
-                                
-                                {/* Nút tắt Tutorial */}
                                 <button onClick={() => setTutorialStep(0)} className="absolute -top-3 -right-3 w-8 h-8 bg-gray-800 text-white rounded-full border-2 border-white flex items-center justify-center hover:bg-rose-500 hover:scale-110 transition-transform shadow-md">
                                     <i className="fa-solid fa-xmark"></i>
                                 </button>
-                                
                                 <div className="flex gap-3 items-start">
                                     <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center text-2xl shrink-0 border-2 border-rose-200 shadow-inner">
                                         <span className="animate-bounce block">✨</span>
@@ -696,12 +910,8 @@
                                     <div>
                                         <h4 className="font-bold text-rose-600 mb-1 text-sm uppercase tracking-wide">{content.title}</h4>
                                         <p className="text-xs text-gray-700 leading-relaxed mb-3">{content.text}</p>
-                                        
                                         {content.next !== null && (
-                                            <button 
-                                                onClick={() => setTutorialStep(content.next)} 
-                                                className="bg-gradient-to-r from-rose-400 to-rose-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-md hover:scale-105 transition-transform flex items-center gap-2"
-                                            >
+                                            <button onClick={() => setTutorialStep(content.next)} className="bg-gradient-to-r from-rose-400 to-rose-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-md hover:scale-105 transition-transform flex items-center gap-2">
                                                 {content.next === 0 ? "Đã hiểu! Bắt đầu thôi" : "Đã hiểu, Tiếp tục"} <i className="fa-solid fa-arrow-right"></i>
                                             </button>
                                         )}
@@ -715,9 +925,19 @@
             
             const renderEditForm = () => (
                 <div className="w-full flex flex-col h-full max-h-full relative z-[1001]">
-                    <h4 className="font-serif text-lg md:text-2xl text-gray-800 mb-2 md:mb-4 border-b border-gray-200 pb-2 md:pb-3 text-center shrink-0">Cập nhật hồ sơ</h4>
+                    <div className="flex justify-between items-center mb-2 md:mb-4 border-b border-gray-200 pb-2 md:pb-3 shrink-0">
+                        <h4 className="font-serif text-lg md:text-2xl text-gray-800">Cập nhật hồ sơ</h4>
+                        {/* HIỂN THỊ NÚT ĐỔI MÃ PIN NẾU ĐÃ CÓ MÃ PIN */}
+                        {selectedMember.pin && (
+                            <button onClick={() => {
+                                setPinConfig({ show: true, mode: 'change', error: '' });
+                                setPinInput1(''); setPinInput2(''); setPinInput3('');
+                            }} className="px-3 py-1 bg-gray-100 text-gray-600 hover:text-rose-500 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider transition-colors border border-gray-200 flex items-center gap-1.5 shadow-sm">
+                                <i className="fa-solid fa-key"></i> Đổi Mã PIN
+                            </button>
+                        )}
+                    </div>
                     
-                    {/* AVATAR UPLOAD - Được Highlight ở Bước 3 */}
                     <div className={`flex justify-center mb-3 md:mb-5 relative group cursor-pointer w-16 h-16 md:w-24 md:h-24 mx-auto shrink-0 hover:scale-105 transition-all duration-300 ${tutorialStep === 3 ? 'tutorial-highlight' : ''}`}>
                         <div className="w-full h-full rounded-full overflow-hidden border-4 border-white shadow-md bg-gray-100 relative z-10">
                             <img src={editForm.avatar} className="w-full h-full object-cover" alt="preview"/>
@@ -730,14 +950,11 @@
                     </div>
 
                     <div className="space-y-2.5 md:space-y-3 text-sm font-sans mb-2 md:mb-4 flex-1 overflow-y-auto pr-1 hide-scrollbar">
-                        
-                        {/* HỌ VÀ TÊN - READONLY */}
                         <div className={tutorialStep === 3 ? 'relative z-10 bg-white' : ''}>
                             <label className="block text-[9px] md:text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1 ml-1 flex justify-between items-center">
                                 <span>Họ và Tên</span>
                                 <span className="text-[8px] text-rose-400 font-bold tracking-widest bg-rose-50 px-2 py-0.5 rounded-full"><i className="fa-solid fa-lock"></i> Khóa</span>
                             </label>
-                            {/* Input dùng readOnly và style xám để biểu thị không sửa được */}
                             <input type="text" value={editForm.name} readOnly title="Bạn không thể tự sửa tên trong danh sách" className="w-full bg-gray-100 text-gray-500 border border-gray-200 rounded-lg md:rounded-xl p-2 md:p-2.5 text-xs md:text-sm outline-none cursor-not-allowed shadow-inner font-medium" />
                         </div>
                         
@@ -746,7 +963,6 @@
                             <textarea rows="2" value={editForm.quote} onChange={e=>setEditForm({...editForm, quote: e.target.value})} className="w-full bg-white border border-gray-200 rounded-lg md:rounded-xl p-2 md:p-2.5 text-xs md:text-sm outline-none focus:border-rose-400 resize-none font-serif shadow-sm" />
                         </div>
                         
-                        {/* FACEBOOK LINK - Được highlight nổi bật thêm ở bước 3 vì bắt buộc */}
                         <div className={`${tutorialStep === 3 ? 'tutorial-highlight p-1 rounded-xl' : ''}`}>
                             <label className="block text-[9px] md:text-[10px] uppercase tracking-wider text-rose-500 font-bold mb-1 ml-1">Facebook Link (*)</label>
                             <input type="url" placeholder="https://fb.com/..." value={editForm.facebook || ''} onChange={e=>setEditForm({...editForm, facebook: e.target.value})} className="w-full bg-white border border-rose-300 rounded-lg md:rounded-xl p-2 md:p-2.5 text-xs md:text-sm outline-none focus:border-rose-500 transition-colors shadow-sm relative z-10" />
@@ -772,34 +988,105 @@
                         </div>
                     </div>
 
-                    {/* SAVE BUTTONS - Được Highlight ở Bước 4 */}
                     <div className={`mt-auto space-y-1.5 md:space-y-2 pt-2 border-t border-gray-200 shrink-0 pb-2 ${tutorialStep === 4 ? 'tutorial-highlight p-1.5 rounded-xl bg-white' : ''}`}>
-                        <button onClick={() => handleSaveProfile(false)} disabled={isUploading} className="w-full py-2 md:py-2.5 bg-gray-900 text-white rounded-lg md:rounded-xl text-[10px] md:text-xs uppercase tracking-widest font-semibold hover:bg-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2 relative z-10">
-                            {isUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Lưu Thay Đổi'}
-                        </button>
-                        <button onClick={() => setCustomDialog({title: "Chốt Hồ Sơ?", message: "Sau khi chốt, bạn sẽ không thể chỉnh sửa thông tin được nữa. Bạn chắc chứ?", type: "confirm", onConfirm: () => handleSaveProfile(true)})} disabled={isUploading} className="w-full py-2 md:py-2.5 border border-rose-200 text-rose-500 rounded-lg md:rounded-xl text-[10px] md:text-xs uppercase tracking-widest hover:bg-rose-50 transition-colors flex items-center justify-center gap-2 font-semibold bg-white relative z-10">
-                            Chốt Vĩnh Viễn <i className="fa-solid fa-lock text-[8px] md:text-[10px]"></i>
-                        </button>
+                        {/* Nếu đã có PIN thì lúc nào ấn lưu cũng auto khóa. Nếu chưa có thì hiện nút "Tạo mã PIN & Chốt" */}
+                        {selectedMember.pin ? (
+                            <button onClick={() => handleSaveProfile('save')} disabled={isUploading} className="w-full py-3 bg-gray-900 text-white rounded-xl text-xs uppercase tracking-widest font-bold hover:bg-black transition-all disabled:opacity-50 flex justify-center items-center gap-2 shadow-md relative z-10">
+                                {isUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-floppy-disk"></i> Lưu & Tự Động Khóa</>}
+                            </button>
+                        ) : (
+                            <>
+                                <button onClick={() => handleSaveProfile('save')} disabled={isUploading} className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-xs uppercase tracking-widest font-semibold hover:bg-gray-200 transition-colors disabled:opacity-50 flex justify-center items-center gap-2 relative z-10">
+                                    {isUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Lưu Tạm Thời'}
+                                </button>
+                                <button onClick={() => handleSaveProfile('create_pin')} disabled={isUploading} className="w-full py-3 bg-rose-500 text-white rounded-xl text-xs uppercase tracking-widest hover:bg-rose-600 transition-all flex items-center justify-center gap-2 font-bold shadow-md shadow-rose-200 relative z-10">
+                                    <i className="fa-solid fa-lock text-[10px]"></i> Tạo Mã PIN & Chốt Vĩnh Viễn
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             );
 
+            // COMPONENT RENDER MÃ PIN MODAL
+            const renderPinModal = () => {
+                if (!pinConfig.show) return null;
+                
+                const { mode } = pinConfig;
+                let title = '', desc = '', btnText = '';
+                
+                if (mode === 'create') {
+                    title = "Tạo Mã PIN";
+                    desc = "Tạo mã gồm 6 số để khóa hồ sơ. Sau này bạn sẽ dùng mã này để sửa thông tin.";
+                    btnText = "Khóa Hồ Sơ";
+                } else if (mode === 'unlock') {
+                    title = "Nhập Mã PIN";
+                    desc = "Hồ sơ đã bị khóa. Vui lòng nhập mã PIN để mở.";
+                    btnText = "Mở Khóa";
+                } else if (mode === 'change') {
+                    title = "Đổi Mã PIN";
+                    desc = "Nhập mã cũ và tạo mã mới của bạn.";
+                    btnText = "Xác nhận Đổi";
+                }
+
+                return (
+                    <div className="fixed inset-0 z-[1050] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setPinConfig({ show: false, mode: '', error: '' })}></div>
+                        <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative z-10 animate-slideUp border border-white/50">
+                            <button onClick={() => setPinConfig({ show: false, mode: '', error: '' })} className="absolute top-4 right-4 text-gray-400 hover:bg-gray-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark"></i></button>
+                            
+                            <div className="text-center mb-6">
+                                <div className="w-14 h-14 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center text-2xl mx-auto mb-3 shadow-inner"><i className="fa-solid fa-shield-halved"></i></div>
+                                <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+                                <p className="text-xs text-gray-500 mt-1">{desc}</p>
+                            </div>
+
+                            <form onSubmit={handlePinSubmit} className="space-y-4">
+                                {mode === 'change' ? (
+                                    <>
+                                        <div>
+                                            <input type="password" inputMode="numeric" maxLength="6" placeholder="Mã PIN Cũ (6 số)" value={pinInput1} onChange={e => setPinInput1(e.target.value.replace(/\D/g, ''))} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-center text-lg tracking-[0.5em] outline-none focus:border-rose-400 font-mono" autoFocus/>
+                                        </div>
+                                        <div>
+                                            <input type="password" inputMode="numeric" maxLength="6" placeholder="Mã PIN Mới (6 số)" value={pinInput2} onChange={e => setPinInput2(e.target.value.replace(/\D/g, ''))} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-center text-lg tracking-[0.5em] outline-none focus:border-blue-400 font-mono" />
+                                        </div>
+                                        <div>
+                                            <input type="password" inputMode="numeric" maxLength="6" placeholder="Xác nhận mã Mới" value={pinInput3} onChange={e => setPinInput3(e.target.value.replace(/\D/g, ''))} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-center text-lg tracking-[0.5em] outline-none focus:border-blue-400 font-mono" />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div>
+                                        <input type="password" inputMode="numeric" maxLength="6" placeholder="• • • • • •" value={pinInput1} onChange={e => setPinInput1(e.target.value.replace(/\D/g, ''))} className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-center text-2xl tracking-[0.7em] outline-none focus:border-rose-400 focus:bg-white transition-colors font-mono font-bold text-gray-800 shadow-inner" autoFocus/>
+                                    </div>
+                                )}
+
+                                {pinConfig.error && <p className="text-xs text-rose-500 font-medium text-center animate-bounce"><i className="fa-solid fa-triangle-exclamation"></i> {pinConfig.error}</p>}
+
+                                <button type="submit" disabled={isUploading} className="w-full py-3 mt-2 bg-gradient-to-r from-rose-400 to-rose-500 text-white rounded-xl text-sm font-bold tracking-widest uppercase hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2">
+                                    {isUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : btnText}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            };
+
             return (
                 <div className="w-screen h-[100dvh] relative bg-[#fdfbfb]" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-                    {/* Nút reset Role nằm ở góc dưới bên phải - Đề phòng User muốn thoát chế độ Khách */}
                     {userRole && (
                         <button onClick={() => { 
                             localStorage.removeItem('kyyeu_userRole'); 
                             setUserRole(null); 
-                            setAuthAttempts(0); // Reset lại số lần thử
+                            setAuthAttempts(0);
                             setShowAuthModal(false);
+                            setSessionUnlockedMembers(new Set()); // Reset lại phiên
                         }} className="fixed bottom-4 right-4 z-[900] w-8 h-8 rounded-full bg-white/60 backdrop-blur border border-gray-200 text-gray-500 hover:text-rose-500 hover:border-rose-200 shadow-sm flex items-center justify-center text-xs transition-all hover:scale-110" title="Đổi vai trò">
                             <i className="fa-solid fa-users-gear"></i>
                         </button>
                     )}
 
-                    {/* Render Tutorial Guide */}
                     {renderTutorialGuide()}
+                    {renderPinModal()}
 
                     <div className="absolute inset-0 z-0 pointer-events-none opacity-40" style={{ backgroundImage: 'radial-gradient(#f43f5e 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-rose-200/40 blur-[100px] z-0 pointer-events-none transition-all duration-1000 ease-in-out"></div>
@@ -841,17 +1128,28 @@
                     )}
 
                     {selectedMedia && (
-                        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 md:p-10 bg-black/90 backdrop-blur-lg animate-fadeIn" onClick={() => setSelectedMedia(null)}>
+                        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 md:p-10 bg-black/95 backdrop-blur-lg animate-fadeIn" onClick={() => setSelectedMedia(null)}>
+                            {/* Chống chuột phải ở view lớn */}
+                            <div className="watermark-overlay"></div>
+                            
                             <button className="absolute top-6 right-6 md:top-10 md:right-10 text-white/50 hover:text-white text-3xl z-50 transition-transform hover:scale-110"><i className="fa-solid fa-xmark"></i></button>
-                            <div className="w-full max-w-5xl h-full flex flex-col items-center justify-center animate-slideUp" onClick={e => e.stopPropagation()}>
-                                {selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" /> : 
-                                <div className="w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black"><iframe src={getEmbedUrl(selectedMedia.url)} className="w-full h-full border-0" allowFullScreen></iframe></div>}
-                                {selectedMedia.caption && <p className="mt-4 text-white text-lg font-cursive text-center drop-shadow-md">{selectedMedia.caption}</p>}
+                            <div className="w-full max-w-5xl h-full flex flex-col items-center justify-center animate-slideUp relative z-10" onClick={e => e.stopPropagation()}>
+                                {selectedMedia.type === 'image' ? (
+                                    <div className="relative inline-block max-w-full max-h-[85vh]">
+                                        {/* Overlay trống đè lên hình để chống bấm giữ điện thoại tải ảnh */}
+                                        <div className="absolute inset-0 z-20"></div>
+                                        <img src={selectedMedia.url} className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl anti-theft-img" draggable="false" />
+                                    </div>
+                                ) : (
+                                    <div className="w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black relative z-20">
+                                        <iframe src={getEmbedUrl(selectedMedia.url)} className="w-full h-full border-0" allowFullScreen></iframe>
+                                    </div>
+                                )}
+                                {selectedMedia.caption && <p className="mt-4 text-white text-lg font-cursive text-center drop-shadow-md relative z-20">{selectedMedia.caption}</p>}
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL THÊM KỶ NIỆM */}
                     {showAddMedia && !appSettings.isTimelineLocked && !isGuest && (
                         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
                             <div className="bg-white/95 backdrop-blur-xl rounded-3xl w-full max-w-md shadow-2xl relative animate-slideUp p-5 md:p-6 border border-white/50">
@@ -908,11 +1206,10 @@
                         </div>
                     )}
 
-                    {/* THEATER MODE SCREEN (RẠP CHIẾU PHIM) */}
                     {isTheaterMode && (
                         <div className="fixed inset-0 z-[500] bg-black flex items-center justify-center overflow-hidden animate-fadeIn">
-                            <button onClick={() => setIsTheaterMode(false)} className="absolute top-6 right-6 text-white/50 hover:text-white z-[550] text-3xl transition-transform hover:scale-110"><i className="fa-solid fa-xmark"></i></button>
-                            {/* ... (Phần Theater giữ nguyên) ... */}
+                            <div className="watermark-overlay z-[560]"></div>
+                            <button onClick={() => setIsTheaterMode(false)} className="absolute top-6 right-6 text-white/50 hover:text-white z-[570] text-3xl transition-transform hover:scale-110"><i className="fa-solid fa-xmark"></i></button>
                             {presentationItems.length > 0 ? (
                                 <div className="relative w-full h-full flex items-center justify-center bg-black">
                                     <button onClick={prevTheaterSlide} className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 text-white/20 hover:text-white z-[550] text-4xl md:text-6xl transition-all hover:scale-110"><i className="fa-solid fa-chevron-left"></i></button>
@@ -925,15 +1222,18 @@
                                             <div key={item.id} className={`absolute inset-0 transition-opacity duration-[1000ms] ease-in-out flex items-center justify-center overflow-hidden bg-black ${isActive ? 'opacity-100 z-[520]' : 'opacity-0 z-0 pointer-events-none'}`}>
                                                 {isActive && (
                                                     item.type === 'titleCard' ? (
-                                                        <div className="w-full h-full flex flex-col items-center justify-center px-4 bg-black">
+                                                        <div className="w-full h-full flex flex-col items-center justify-center px-4 bg-black relative z-10">
                                                             <h1 className="text-2xl md:text-5xl lg:text-6xl font-bold uppercase tracking-[0.2em] md:tracking-[0.4em] text-white animate-titleReveal text-center drop-shadow-2xl">{item.title}</h1>
                                                         </div>
                                                     ) : item.type === 'endingCard' ? (
-                                                        <div className="w-full h-full flex flex-col items-center justify-center px-8 bg-black">
+                                                        <div className="w-full h-full flex flex-col items-center justify-center px-8 bg-black relative z-10">
                                                             <p className="text-xl md:text-4xl font-serif italic text-rose-200 animate-textReveal text-center drop-shadow-2xl max-w-5xl leading-relaxed">{item.title}</p>
                                                         </div>
                                                     ) : item.type === 'image' ? (
-                                                        <img src={item.url} className={`w-full h-full object-contain origin-center animate-kenburns ${!isJourney ? 'sepia-[0.3] grayscale-[0.1] contrast-125 brightness-90' : 'brightness-100'}`} />
+                                                        <div className="absolute inset-0 w-full h-full">
+                                                            <div className="absolute inset-0 z-20 pointer-events-auto" onContextMenu={e=>e.preventDefault()}></div>
+                                                            <img src={item.url} draggable="false" className={`anti-theft-img w-full h-full object-contain origin-center animate-kenburns ${!isJourney ? 'sepia-[0.3] grayscale-[0.1] contrast-125 brightness-90' : 'brightness-100'}`} />
+                                                        </div>
                                                     ) : (
                                                         <div className="w-full max-w-5xl aspect-video rounded-xl md:rounded-2xl overflow-hidden shadow-2xl relative z-[530] pointer-events-auto bg-black border border-white/10">
                                                             <iframe src={getEmbedUrl(item.url)} className="w-full h-full border-0" allowFullScreen></iframe>
@@ -976,10 +1276,9 @@
 
                     <div className="relative w-full h-[100dvh] z-10 overflow-hidden" style={{ perspective: '2000px', transformStyle: 'preserve-3d' }}>
                         
-                        {/* SLIDE 0 & 1 GIỮ NGUYÊN ... */}
                         <div style={getSlideStyle(0)} className="w-full h-full flex flex-col justify-center items-center px-4 md:px-6 relative overflow-hidden group">
                             <div className="absolute inset-0 z-0 opacity-40">
-                                <img src="https://i.pinimg.com/736x/01/81/1d/01811d3880cd97de1f43bc1ad8730eb0.jpg" className="w-full h-full object-cover animate-kenburns-slow" alt="Light bg"/>
+                                <img src="https://i.pinimg.com/736x/01/81/1d/01811d3880cd97de1f43bc1ad8730eb0.jpg" className="w-full h-full object-cover animate-kenburns-slow anti-theft-img" draggable="false" alt="bg"/>
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-white/90"></div>
                             </div>
                             <div className="text-center max-w-4xl mx-auto transition-all duration-1000 delay-300 transform z-10 glass p-8 md:p-16 rounded-[3rem] shadow-xl border border-white/60" style={{ transform: currentSlide === 0 ? 'translateY(0)' : 'translateY(30px)' }}>
@@ -998,9 +1297,10 @@
                         <div style={getSlideStyle(1)} className="w-full h-full flex items-center justify-center px-4 md:px-6">
                             <div className={`max-w-5xl mx-auto w-full glass rounded-[2.5rem] p-6 md:p-12 flex flex-col md:flex-row gap-8 items-center transition-all duration-1000 delay-200 transform ${currentSlide === 1 ? 'translate-y-0' : 'translate-y-10'}`}>
                                 <div className="w-full md:w-2/5 flex justify-center">
-                                    <div className="w-56 h-72 md:w-64 md:h-[22rem] rounded-t-full rounded-b-[40px] p-2 bg-white shadow-xl border border-gray-100 transition-transform hover:scale-105 duration-500">
+                                    <div className="w-56 h-72 md:w-64 md:h-[22rem] rounded-t-full rounded-b-[40px] p-2 bg-white shadow-xl border border-gray-100 transition-transform hover:scale-105 duration-500 relative group">
+                                        <div className="absolute inset-0 z-20" onContextMenu={e=>e.preventDefault()}></div>
                                         <div className="w-full h-full rounded-t-full rounded-b-[32px] overflow-hidden bg-rose-50">
-                                            <img src="teacher.jpg" alt="Thầy Chủ Nhiệm" className="w-full h-full object-cover" />
+                                            <img src="teacher.jpg" alt="Thầy Chủ Nhiệm" className="w-full h-full object-cover anti-theft-img" draggable="false" />
                                         </div>
                                     </div>
                                 </div>
@@ -1012,13 +1312,11 @@
                             </div>
                         </div>
                         
-                        {/* SLIDE 2: THÀNH VIÊN - NƠI BẮT ĐẦU TUTORIAL */}
                         <div style={getSlideStyle(2)} className="w-full h-full flex flex-col pt-16 md:pt-20 pb-20">
                             <div className="text-center mb-6 md:mb-10 px-4 relative z-[10]">
                                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-2">
                                     <h2 className="text-3xl md:text-4xl font-serif text-gray-800">Mảnh Ghép Thanh Xuân</h2>
                                     <div className="flex items-center gap-2">
-                                        {/* Nút Tìm kiếm được Highlight ở Bước 1 */}
                                         <button 
                                             onClick={() => setShowMemberList(true)} 
                                             className={`w-8 h-8 rounded-full bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center justify-center text-sm ${tutorialStep === 1 ? 'tutorial-highlight scale-125' : ''}`} 
@@ -1027,7 +1325,6 @@
                                             <i className="fa-solid fa-list-ol"></i>
                                         </button>
                                         
-                                        {/* NÚT KÍCH HOẠT HƯỚNG DẪN - Ẩn đối với Khách */}
                                         {!isGuest && (
                                             <button 
                                                 onClick={() => setTutorialStep(1)} 
@@ -1050,7 +1347,6 @@
                                                 setSelectedMember(member); 
                                                 setEditForm(member); 
                                                 setIsEditing(false); 
-                                                // Nếu đang ở bước 1, tự động chuyển sang bước 2
                                                 if (tutorialStep === 1) setTimeout(() => setTutorialStep(2), 300);
                                             }} 
                                             className={`glass rounded-2xl p-3 flex flex-col items-center text-center cursor-pointer group hover:border-rose-200 transition-all transform hover:-translate-y-1 shadow-sm hover:shadow-md relative ${tutorialStep === 1 && index === 0 ? 'tutorial-highlight scale-105' : ''}`} 
@@ -1058,7 +1354,8 @@
                                         >
                                             {member.isLocked && <div className="absolute top-2 right-2 z-10 bg-white p-1 rounded-full shadow-sm text-rose-400"><i className="fa-solid fa-lock text-[10px]"></i></div>}
                                             <div className="w-16 h-16 md:w-20 md:h-20 mb-3 relative overflow-hidden rounded-full border-2 border-white shadow-sm bg-gray-50 group-hover:scale-105 transition-transform duration-500">
-                                                <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 z-20 pointer-events-auto" onContextMenu={e=>e.preventDefault()}></div>
+                                                <img src={member.avatar} alt={member.name} className="anti-theft-img w-full h-full object-cover" draggable="false" />
                                             </div>
                                             <h3 className="font-sans font-semibold text-gray-800 text-[11px] md:text-sm group-hover:text-rose-500 transition-colors line-clamp-1 w-full">{member.name}</h3>
                                             <p className="text-[9px] text-gray-400 font-medium tracking-wider uppercase mt-1 w-full truncate">{member.role}</p>
@@ -1068,11 +1365,8 @@
                             </div>
                         </div>
 
-                        {/* CÁC SLIDE KHÁC GIỮ NGUYÊN */}
-                        {/* SLIDE 3: THƯỚC PHIM TỔNG HỢP */}
                         <div style={getSlideStyle(3)} className="w-full h-full flex flex-col pt-16 md:pt-20 pb-20 overflow-y-auto hide-scrollbar">
                             <div className="max-w-6xl mx-auto w-full px-4 md:px-12 flex flex-col h-full">
-                                {/* HTML cũ phần Header Thước phim */}
                                 <div className="flex flex-col lg:flex-row justify-between items-center mb-6 gap-4">
                                     <div className="text-center lg:text-left shrink-0">
                                         <h2 className="text-3xl md:text-4xl font-serif text-gray-800 mb-1">Thước Phim Chung</h2>
@@ -1101,8 +1395,7 @@
                                         )}
                                     </div>
                                 </div>
-                                {/* Gallery Images */}
-                                <div className="flex-1 overflow-y-auto hide-scrollbar pb-10 gallery-3d-container p-2 md:p-4">
+                                <div className="flex-1 overflow-y-auto hide-scrollbar pb-10 gallery-3d-container p-2 md:p-4 relative">
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8 auto-rows-[160px] md:auto-rows-[220px]">
                                         {(() => {
                                             const filteredGallery = gallery.filter(item => {
@@ -1117,8 +1410,8 @@
                                             }
 
                                             return filteredGallery.map((item, index) => (
-                                                <div key={item.id} draggable={!appSettings.isTimelineLocked && !isGuest ? "true" : "false"} onDragStart={(e) => handleDragStart(e, item)} onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, item)} className={`polaroid-3d tilt-${index % 4} ${item.colSpan} row-span-1 relative group w-full h-full ${!appSettings.isTimelineLocked && !isGuest ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} flex flex-col`}>
-                                                    <div className="absolute inset-0 z-20" onClick={() => setSelectedMedia(item)}></div>
+                                                <div key={item.id} draggable={!appSettings.isTimelineLocked && !isGuest ? "true" : "false"} onDragStart={(e) => handleDragStart(e, item)} onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, item)} className={`polaroid-3d tilt-${index % 4} ${item.colSpan} row-span-1 relative group w-full h-full flex flex-col`}>
+                                                    <div className="absolute inset-0 z-20 cursor-pointer" onClick={() => setSelectedMedia(item)} onContextMenu={e=>e.preventDefault()}></div>
                                                     {gradeFilter === 'all' && (
                                                         <div className="absolute top-2 left-2 z-30 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md text-[9px] font-bold text-rose-500 uppercase shadow-sm border border-rose-100">{item.grade || '12A3'}</div>
                                                     )}
@@ -1126,7 +1419,8 @@
                                                         <button onClick={(e) => handleDeleteMedia(e, item.id)} className="absolute top-3 right-3 w-8 h-8 bg-white/80 backdrop-blur hover:bg-rose-600 text-rose-500 hover:text-white rounded-full flex items-center justify-center transition-all shadow-md z-30 opacity-90 md:opacity-0 group-hover:opacity-100 scale-100 hover:scale-110" title="Gỡ ảnh này"><i className="fa-solid fa-trash-can text-[11px]"></i></button>
                                                     )}
                                                     <div className="flex-1 w-full relative overflow-hidden rounded-lg bg-gray-100 pointer-events-none">
-                                                        {item.type === 'image' ? <img src={item.url} alt="Kỷ niệm" className="w-full h-full object-cover" /> : (
+                                                        <div className="watermark-overlay z-10 opacity-30"></div>
+                                                        {item.type === 'image' ? <img src={item.url} alt="Kỷ niệm" className="anti-theft-img w-full h-full object-cover" draggable="false" /> : (
                                                             <div className="w-full h-full bg-gray-900 flex items-center justify-center relative">
                                                                 <img src={item.url} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-[2px]" onError={(e) => e.target.style.display = 'none'}/>
                                                                 <div className="w-12 h-12 bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center relative z-10 text-white shadow-lg border border-white/50"><i className="fa-solid fa-play ml-1"></i></div>
@@ -1143,10 +1437,8 @@
                             </div>
                         </div>
 
-                        {/* SLIDE 4 & 5 ... */}
                         <div style={getSlideStyle(4)} className="w-full h-full flex flex-col pt-16 md:pt-20 pb-20 overflow-y-auto hide-scrollbar scroll-smooth">
                             <div className="max-w-6xl mx-auto w-full px-4 md:px-8 relative">
-                                {/* HTML cũ phần Timeline ... */}
                                 <div className="text-center mb-10 relative z-10 shrink-0">
                                     <h2 className="text-4xl md:text-5xl font-serif text-gray-800 mb-2">Hành Trình</h2>
                                     <p className="text-gray-500 text-xs tracking-widest uppercase mb-6">Chuyến tàu thanh xuân 10 - 12</p>
@@ -1188,13 +1480,14 @@
                                                     {stageImages.length > 0 ? (
                                                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[160px] md:auto-rows-[200px]">
                                                             {stageImages.map((item, idx) => (
-                                                                <div key={item.id} draggable={!appSettings.isTimelineLocked && !isGuest ? "true" : "false"} onDragStart={(e) => handleDragStart(e, item)} onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, item)} className={`polaroid-3d tilt-${idx % 4} ${item.colSpan} row-span-1 relative group w-full h-full ${!appSettings.isTimelineLocked && !isGuest ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} flex flex-col`}>
-                                                                    <div className="absolute inset-0 z-20" onClick={() => setSelectedMedia(item)}></div>
+                                                                <div key={item.id} draggable={!appSettings.isTimelineLocked && !isGuest ? "true" : "false"} onDragStart={(e) => handleDragStart(e, item)} onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, item)} className={`polaroid-3d tilt-${idx % 4} ${item.colSpan} row-span-1 relative group w-full h-full flex flex-col`}>
+                                                                    <div className="absolute inset-0 z-20 cursor-pointer" onClick={() => setSelectedMedia(item)} onContextMenu={e=>e.preventDefault()}></div>
                                                                     {!appSettings.isTimelineLocked && !isGuest && item.uploaderUid && currentUser?.uid && item.uploaderUid === currentUser.uid && (
                                                                         <button onClick={(e) => handleDeleteMedia(e, item.id)} className="absolute top-3 right-3 w-8 h-8 bg-white/80 backdrop-blur hover:bg-rose-600 text-rose-500 hover:text-white rounded-full flex items-center justify-center transition-all shadow-md z-30 opacity-90 md:opacity-0 group-hover:opacity-100 scale-100 hover:scale-110" title="Gỡ ảnh này"><i className="fa-solid fa-trash-can text-[11px]"></i></button>
                                                                     )}
                                                                     <div className="flex-1 w-full relative overflow-hidden rounded-lg bg-gray-100 pointer-events-none border border-black/5">
-                                                                        {item.type === 'image' ? <img src={item.url} alt="Kỷ niệm" className="w-full h-full object-cover" /> : (
+                                                                        <div className="watermark-overlay z-10 opacity-30"></div>
+                                                                        {item.type === 'image' ? <img src={item.url} alt="Kỷ niệm" className="anti-theft-img w-full h-full object-cover" draggable="false" /> : (
                                                                             <div className="w-full h-full bg-gray-900 flex items-center justify-center relative"><img src={item.url} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-[2px]" onError={(e) => e.target.style.display = 'none'}/><div className="w-12 h-12 bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center relative z-10 text-white shadow-lg border border-white/50"><i className="fa-solid fa-play ml-1"></i></div></div>
                                                                         )}
                                                                     </div>
@@ -1246,26 +1539,25 @@
                         </div>
                     </div>
 
-                    {/* MAIN POPUP: XEM THÔNG TIN VÀ LƯU BÚT */}
                     {selectedMember && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6">
                             <div className="absolute inset-0 bg-black/40 backdrop-blur-md animate-fadeIn" onClick={() => { 
                                 setSelectedMember(null); 
                                 setIsEditing(false); 
-                                if(tutorialStep > 0) setTutorialStep(0); // Tắt tutorial nếu user tắt form
+                                if(tutorialStep > 0) setTutorialStep(0); 
                             }}></div>
                             
                             <div className="relative w-full max-w-5xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[90dvh] md:h-[650px] z-[101] border border-white/20 animate-slideUp">
                                 
                                 <button onClick={() => { setSelectedMember(null); setIsEditing(false); if(tutorialStep>0) setTutorialStep(0); }} className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 bg-gray-100/80 backdrop-blur rounded-full w-8 h-8 flex items-center justify-center z-[110] transition-transform hover:scale-110"><i className="fa-solid fa-xmark"></i></button>
 
-                                {/* LEFT SIDE: PROFILE INFO */}
                                 <div className={`w-full md:w-5/12 p-4 md:p-10 flex flex-col items-center relative overflow-y-auto hide-scrollbar shrink-0 h-[45%] md:h-full ${(!isEditing || isMobile) ? (PROFILE_THEMES.find(t=>t.id===selectedMember.theme)?.light || 'bg-rose-50') : 'bg-gray-50'} transition-colors duration-500 border-b md:border-b-0 md:border-r border-white/50`}>
                                     {(!isEditing || isMobile) ? (
                                         <>
-                                            <div className={`w-24 h-24 md:w-36 md:h-36 mt-4 rounded-full p-1.5 mb-3 md:mb-6 shadow-xl ${PROFILE_THEMES.find(t=>t.id===selectedMember.theme)?.bg || 'bg-rose-400'} bg-opacity-20 shrink-0 transition-transform hover:scale-105 duration-300`}>
+                                            <div className={`w-24 h-24 md:w-36 md:h-36 mt-4 rounded-full p-1.5 mb-3 md:mb-6 shadow-xl ${PROFILE_THEMES.find(t=>t.id===selectedMember.theme)?.bg || 'bg-rose-400'} bg-opacity-20 shrink-0 transition-transform hover:scale-105 duration-300 relative group`}>
+                                                <div className="absolute inset-0 z-20" onContextMenu={e=>e.preventDefault()}></div>
                                                 <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-white">
-                                                    <img src={selectedMember.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                                    <img src={selectedMember.avatar} alt="Avatar" className="w-full h-full object-cover anti-theft-img" draggable="false" />
                                                 </div>
                                             </div>
                                             <h3 className="font-serif text-xl md:text-3xl text-center mb-1 md:mb-2 font-medium text-gray-800">{selectedMember.name}</h3>
@@ -1284,20 +1576,28 @@
                                             
                                             <div className="mt-auto pt-4 md:pt-6 flex flex-col gap-2 w-full pb-2 shrink-0">
                                                 {!isGuest ? (
-                                                    !selectedMember.isLocked ? (
+                                                    // Kiểm tra nếu đã mở khóa trong phiên hoặc chưa từng khóa
+                                                    (!selectedMember.isLocked || sessionUnlockedMembers.has(selectedMember.id)) ? (
                                                         <button 
                                                             onClick={() => { 
                                                                 setIsEditing(true); 
-                                                                if (tutorialStep === 2) setTimeout(() => setTutorialStep(3), 300); // Chuyển sang bước 3
+                                                                if (tutorialStep === 2) setTimeout(() => setTutorialStep(3), 300); 
                                                             }} 
                                                             className={`w-full py-2 md:py-2.5 rounded-xl bg-white/50 text-gray-600 text-[10px] md:text-xs font-semibold uppercase tracking-widest hover:bg-white transition-all shadow-sm flex items-center justify-center gap-2 hover:shadow-md ${tutorialStep === 2 ? 'tutorial-highlight scale-105' : ''}`}
                                                         >
                                                             <i className="fa-solid fa-pen"></i> Sửa hồ sơ
                                                         </button>
                                                     ) : (
-                                                        <div className="w-full py-2 md:py-2.5 rounded-xl bg-gray-100 text-rose-500 text-[10px] md:text-xs font-medium uppercase tracking-widest flex items-center justify-center gap-2">
-                                                            <i className="fa-solid fa-lock"></i> Đã niêm phong
-                                                        </div>
+                                                        // Đã khóa và chưa nhập PIN
+                                                        <button 
+                                                            onClick={() => {
+                                                                setPinConfig({ show: true, mode: 'unlock', error: '' });
+                                                                setPinInput1('');
+                                                            }} 
+                                                            className="w-full py-2 md:py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-500 hover:bg-rose-100 hover:scale-105 text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm"
+                                                        >
+                                                            <i className="fa-solid fa-lock"></i> Sửa hồ sơ (Cần mã PIN)
+                                                        </button>
                                                     )
                                                 ) : (
                                                     <div className="w-full py-2 md:py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 text-[10px] md:text-xs font-medium uppercase tracking-widest flex items-center justify-center gap-2">
@@ -1311,7 +1611,6 @@
                                     )}
                                 </div>
 
-                                {/* RIGHT SIDE: GUESTBOOK WALL */}
                                 <div className="w-full md:w-7/12 flex flex-col h-[55%] md:h-full shrink-0 bg-white relative">
                                     <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100 flex items-center gap-3 bg-white/80 backdrop-blur z-10 shrink-0">
                                         <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-400"><i className="fa-regular fa-message text-[10px] md:text-sm"></i></div>
@@ -1366,7 +1665,6 @@
                         </div>
                     )}
 
-                    {/* MOBILE EDIT POPUP (BOTTOM SHEET) */}
                     {(isEditing && isMobile && selectedMember) && (
                         <div className="fixed inset-0 z-[200] flex items-end justify-center md:hidden">
                             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fadeIn" onClick={() => setIsEditing(false)}></div>
@@ -1378,7 +1676,6 @@
                         </div>
                     )}
 
-                    {/* MODAL: TRA CỨU SỐ THỨ TỰ */}
                     {showMemberList && (
                         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
                             <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh] md:max-h-[70vh] animate-slideUp relative border border-white/50">
@@ -1421,38 +1718,6 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
-
-
-        // Chặn chuột phải
-window.addEventListener('contextmenu', e => e.preventDefault());
-
-// Chặn phím
-window.addEventListener('keydown', function(e) {
-
-    // Ctrl+U
-    if (e.ctrlKey && e.key.toLowerCase() === 'u') {
-        e.preventDefault();
-        return false;
-    }
-
-    // Ctrl+Shift+I
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') {
-        e.preventDefault();
-        return false;
-    }
-
-    // Ctrl+Shift+J
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        return false;
-    }
-
-    // F12
-    if (e.key === 'F12') {
-        e.preventDefault();
-        return false;
-    }
-});
     </script>
 </body>
 </html>
