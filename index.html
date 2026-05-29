@@ -130,17 +130,8 @@
             -webkit-user-drag: none;
             pointer-events: none; /* Ngăn nhấn giữ trên điện thoại để lưu ảnh */
         }
-        
-        /* Watermark mờ chống chụp màn hình */
-        .watermark-overlay {
-            position: absolute;
-            inset: 0;
-            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' font-size='20' fill='rgba(255,255,255,0.15)' font-family='Arial' font-weight='bold' text-anchor='middle' alignment-baseline='middle' transform='rotate(-45, 100, 100)'%3EK%E1%BB%B7 Y%E1%BA%BFu 12A3%3C/text%3E%3C/svg%3E");
-            pointer-events: none;
-            z-index: 50;
-        }
 
-        /* --- CƠ CHẾ CHỐNG CHỤP MÀN HÌNH TỐC ĐỘ CAO --- */
+        /* --- CƠ CHẾ CHỐNG CHỤP MÀN HÌNH TỐC ĐỘ CAO (DÀNH CHO MÁY TÍNH) --- */
         /* Không dùng blur vì render chậm, dùng opacity 0 để đen ngay lập tức */
         body.anti-screenshot-active {
             background-color: #111 !important;
@@ -1129,9 +1120,6 @@
 
                     {selectedMedia && (
                         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 md:p-10 bg-black/95 backdrop-blur-lg animate-fadeIn" onClick={() => setSelectedMedia(null)}>
-                            {/* Chống chuột phải ở view lớn */}
-                            <div className="watermark-overlay"></div>
-                            
                             <button className="absolute top-6 right-6 md:top-10 md:right-10 text-white/50 hover:text-white text-3xl z-50 transition-transform hover:scale-110"><i className="fa-solid fa-xmark"></i></button>
                             <div className="w-full max-w-5xl h-full flex flex-col items-center justify-center animate-slideUp relative z-10" onClick={e => e.stopPropagation()}>
                                 {selectedMedia.type === 'image' ? (
@@ -1208,7 +1196,6 @@
 
                     {isTheaterMode && (
                         <div className="fixed inset-0 z-[500] bg-black flex items-center justify-center overflow-hidden animate-fadeIn">
-                            <div className="watermark-overlay z-[560]"></div>
                             <button onClick={() => setIsTheaterMode(false)} className="absolute top-6 right-6 text-white/50 hover:text-white z-[570] text-3xl transition-transform hover:scale-110"><i className="fa-solid fa-xmark"></i></button>
                             {presentationItems.length > 0 ? (
                                 <div className="relative w-full h-full flex items-center justify-center bg-black">
@@ -1419,7 +1406,6 @@
                                                         <button onClick={(e) => handleDeleteMedia(e, item.id)} className="absolute top-3 right-3 w-8 h-8 bg-white/80 backdrop-blur hover:bg-rose-600 text-rose-500 hover:text-white rounded-full flex items-center justify-center transition-all shadow-md z-30 opacity-90 md:opacity-0 group-hover:opacity-100 scale-100 hover:scale-110" title="Gỡ ảnh này"><i className="fa-solid fa-trash-can text-[11px]"></i></button>
                                                     )}
                                                     <div className="flex-1 w-full relative overflow-hidden rounded-lg bg-gray-100 pointer-events-none">
-                                                        <div className="watermark-overlay z-10 opacity-30"></div>
                                                         {item.type === 'image' ? <img src={item.url} alt="Kỷ niệm" className="anti-theft-img w-full h-full object-cover" draggable="false" /> : (
                                                             <div className="w-full h-full bg-gray-900 flex items-center justify-center relative">
                                                                 <img src={item.url} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-[2px]" onError={(e) => e.target.style.display = 'none'}/>
@@ -1486,7 +1472,6 @@
                                                                         <button onClick={(e) => handleDeleteMedia(e, item.id)} className="absolute top-3 right-3 w-8 h-8 bg-white/80 backdrop-blur hover:bg-rose-600 text-rose-500 hover:text-white rounded-full flex items-center justify-center transition-all shadow-md z-30 opacity-90 md:opacity-0 group-hover:opacity-100 scale-100 hover:scale-110" title="Gỡ ảnh này"><i className="fa-solid fa-trash-can text-[11px]"></i></button>
                                                                     )}
                                                                     <div className="flex-1 w-full relative overflow-hidden rounded-lg bg-gray-100 pointer-events-none border border-black/5">
-                                                                        <div className="watermark-overlay z-10 opacity-30"></div>
                                                                         {item.type === 'image' ? <img src={item.url} alt="Kỷ niệm" className="anti-theft-img w-full h-full object-cover" draggable="false" /> : (
                                                                             <div className="w-full h-full bg-gray-900 flex items-center justify-center relative"><img src={item.url} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-[2px]" onError={(e) => e.target.style.display = 'none'}/><div className="w-12 h-12 bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center relative z-10 text-white shadow-lg border border-white/50"><i className="fa-solid fa-play ml-1"></i></div></div>
                                                                         )}
